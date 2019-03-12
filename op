@@ -1,0 +1,105 @@
+#!/bin/sh
+## op - quick and dirty tmux session manager powered by fd and fzf
+# Copyright 2019 Sanchez Xavier
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+# 	http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+FD='fdfind --type d -j4 -L'
+export FZF_DEFAULT_COMMAND="$FD ."
+CMD=vim
+
+usage() {
+	echo "op - quickly open tmux sessions."
+	echo "Usage: op [option [args] | session_name]"
+	echo
+	echo "Options:"
+	echo
+	echo "	query	Start the finder with the given query"
+	echo
+	echo "	-h, --help	display this usage help"
+	echo
+	echo "	-c, --create	create a new directory and a new session"
+	echo
+	echo "Example:"
+	echo "\`op MyProject\` will fuzzy find a dir matching the fzf query 'MyProject'"
+	echo "and will create a tmux session based on the dir name and a checksum of"
+	echo "the fullpath to avoid duplicate sessions for different paths matching"
+	echo "the same name. Then starting op again will list existing tmux session and will allow"
+	echo "to find and attach them as well."
+}
+
+fd() {
+	fdfind --type d -j4
+}
+
+getsessionlist() {
+	_string="$1"
+	tmux list-session -F "#{pane_current_path} [#S] #{session_attached}" 2>/dev/null |
+		column -t -s' ' |
+		if test -n "$_string"; then
+			grep -i "$_string"
+		else
+			cat -
+		fi
+	unset _string
+}
+
+getworkdir() {
+	_string="$1"
+	## Return a list of matching directories
+	_list="$(
+		(
+			getsessionlist "$_string"
+			fd
+		) |
+			fzf -q "$1" |
+			cut -d' ' -f1
+	)"
+	_selection="$(readlink -f "${_list}")"
+	printf %s "$_selection"
+	unset _string _list _selection
+}
+
+getsessionname() {
+	_string="$1"
+	test -z "$_string" && exit 2
+	_dirname="$(printf %s "$_string" | tr '.,[]{}(): ' '-')"
+	## Add a suffix to the session name from the full-path hash
+	_id="$(printf %s "$_string" | sha256sum | cut -c 1-5)"
+	printf %s "${_dirname##*/}-${_id}"
+	unset _string
+}
+
+case "$1" in
+-h | --help)
+	usage | fmt -w80
+	exit
+	;;
+-c | --create)
+	shift
+	mkdir -p "$1"
+	;;
+esac
+
+WORKDIR="$(getworkdir "$1")"
+SESSION="$(getsessionname "$WORKDIR")"
+
+if test -n "$SESSION"; then
+	FD='fdfind --type f -j4 -L' ## Set fd search type to file for vim
+	export FZF_DEFAULT_COMMAND="$FD ."
+	if tmux list-session -F "#S" | grep -q "^${SESSION}"; then
+		tmux attach -t "$SESSION"
+	else
+		tmux new-session -s "$SESSION" -c "$WORKDIR" "$CMD"
+	fi
+fi
