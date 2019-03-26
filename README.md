@@ -8,8 +8,9 @@ Actually it requires fdfind and fzf.
 ## Installation
 
 ```
-sudo apt install fd-find fzf # Debian 10
-cp op ~/.local/bin # or where you want it to be installed
+make deps    # prints required dependencies
+make install # the default PREFIX is ~/.local/bin
+sudo make install PREFIX=/usr/local/bin # if you want to make it system-wide
 ```
 
 ## How to use it
