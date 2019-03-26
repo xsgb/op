@@ -51,7 +51,6 @@ getsessionlist() {
 		else
 			cat -
 		fi
-	unset _string
 }
 
 getworkdir() {
@@ -67,7 +66,6 @@ getworkdir() {
 	)"
 	_selection="$(readlink -f "${_list}")"
 	printf %s "$_selection"
-	unset _string _list _selection
 }
 
 getsessionname() {
@@ -77,7 +75,6 @@ getsessionname() {
 	## Add a suffix to the session name from the full-path hash
 	_id="$(printf %s "$_string" | sha256sum | cut -c 1-5)"
 	printf %s "${_dirname##*/}-${_id}"
-	unset _string
 }
 
 case "$1" in
